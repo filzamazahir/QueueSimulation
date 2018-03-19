@@ -47,10 +47,13 @@ def generate_1000_exponential_random_values():
 		expoential_rv = generate_exponential_random_value(mu)
 		exponential_rv_list.append(expoential_rv)
 
-	# Check with mean and variance (convert to numpy array and use np.mean and np.var)
+	# Check with mean and variance 
+	# Convert to numpy array and use np.mean and np.var
 	exponential_rv_arr = np.array(exponential_rv_list)
-	print('Mean - 1000 exponential random values (expected 10): {0:.1f}'.format(np.mean(exponential_rv_arr))) 
-	print('Variance - 1000 exponential random values (expected 100): {0:.1f}'.format(np.var(exponential_rv_arr))) 
+	mean = np.mean(exponential_rv_arr)
+	var = np.var(exponential_rv_arr)
+	print('Mean - 1000 exponential random values (expected 10): {0:.1f}'.format(mean)) 
+	print('Variance - 1000 exponential random values (expected 100): {0:.1f}'.format(var)) 
 	return
 
 
@@ -59,16 +62,15 @@ class Simulation:
 	def __init__(self, arrival_process, service_process, n, K, T, L, C, rho, L1, L2, prob):
 
 		#Input variables
-		self.T = T  # Time to run the simulation
-		
-		self.L = L # Average packet length in bits
-		self.C = C # Transmission rate in bits/second
-		self.rho = rho # Utilization factor of the queue
-
 		self.arrival_process = arrival_process  # Arrival process given by 'M' or 'D'
 		self.service_process = service_process  # Service process given by 'M', 'D' or 'G'
 		self.n = n # Number of servers in the queue
 		self.K = K  # Size of buffer
+
+		self.T = T  # Total time to run the simulation
+		self.L = L # Average packet length in bits
+		self.C = C # Transmission rate in bits/second
+		self.rho = rho # Utilization factor of the queue
 
 		self.L1 = L1  # For General service process, L1 is the packet length with probability of prob
 		self.L2 = L2 # For General service process, L2 is the packet length with probability of (1-prob)
@@ -77,30 +79,27 @@ class Simulation:
 		self.lambd = (self.n * self.rho * self.C )/ self.L  # Arrival rate (average number of packets generated per second)
 		self.alpha = self.lambd  # Observer rate - same as lambda so observations are in the same order as arrival packets
 
-		# Output variables - State of the system and performance metrics
-		self.Na = 0 # Number of packet arrivals 
-		self.Nd = 0 # Number of packet departures 
+		# State of the system 
+		self.Na = 0 # Number of packet arrival events
+		self.Nd = 0 # Number of packet departure events
 		self.No = 0 # Number of observervation events
 		self.Nt = 0 # Total number of packets in the system
-
-		self.Tsojourn = []  # Total soujourn time for each packet
-		self.Nt_observer = [] # No. of packets in system as seen by each observer event
-		self.Nt_arrival = [] # No. of packets in system as seen by each arrival event
-		self.Pidle = 1  # Proportion of the time servers are idle
-		self.Ploss = 0 # Packet loss probability (no. of packets lost / total number of packets)
-
 
 		# Helper variables to keep track of things and determine the output variables
 		self.time_system_idle = 0  # Total time in the simulation that system is idle
 		self.last_departure_time = 0  # Departure time of the last packet that departed from the system
+
+		self.Tsojourn = []  # Total soujourn time for each packet
+		self.Nt_observer = [] # No. of packets in system as seen by each observer event
+		self.Nt_arrival = [] # No. of packets in system as seen by each arrival event
+
 		self.dropped_packet_ids = set() # Set of packet ids for the packets that are dropped on arrival because of full buffer
 		self.total_packets_generated = 0 # Total number of packets generated in the system
 		
 		print('Simulation -> {0}/{1}/{2}/{3} (Rho = {4}, Lambda = {5})'.format(self.arrival_process, self.service_process, self.n, self.K, self.rho, self.lambd))
 		
 		# Create Event Scheduler 
-		# self.Event_Scheduler = [] # List of events, where events are stores as tuples ('packet_id' 'event_type', event_time)
-		self.create_event_scheduler()  # Create event scheduler here
+		self.create_event_scheduler()  
 
 
 	# Function to generate arrival time based on the type of arrival process
@@ -127,9 +126,6 @@ class Simulation:
 
 		# General Distribution with bipolar length for service process
 		elif self.service_process == 'G':
-			# length = np.random.choice([self.L1, self.L2], 1, p=[self.prob, 1-self.prob])
-			# packet_length = length[0]
-
 			uniform_random_value = random.uniform(0, 1)
 			if uniform_random_value <= self.prob:
 				packet_length = self.L1
@@ -146,8 +142,7 @@ class Simulation:
 	# Create an Event Scheduler
 	def create_event_scheduler(self):
 
-		# print('Creating Event Scheduler -> {0}/{1}/{2}/{3} (Rho = {4}, Lambda = {5})'.format(self.arrival_process, self.service_process, self.n, self.K, self.rho, self.lambd))
-		# t0=time.time()
+		t0=time.time()
 
 		# List of all events
 		events_list = []
@@ -211,8 +206,9 @@ class Simulation:
 		# Create Event Scheduler as a double ended queue from the events_list
 		self.Event_Scheduler = deque(events_list)
 
-		# t1 = time.time()
-		# print('Time taken in create event scheduler:', t1-t0)
+		t1 = time.time()
+		if (t1-t0) > 6:
+			print('Time taken in create event scheduler:', t1-t0)
 
 		return
 
@@ -252,8 +248,7 @@ class Simulation:
 	# Run the simulation - goes through each event in the Event Scheduler and calls its respective function
 	def run_simulation(self):
 
-		# print('Running Simulation -> {0}/{1}/{2}/{3} (Rho = {4}, Lambda = {5})'.format(self.arrival_process, self.service_process, self.n, self.K, self.rho, self.lambd))
-		# t0 = time.time()
+		t0 = time.time()
 
 
 		while self.Event_Scheduler:
@@ -285,7 +280,7 @@ class Simulation:
 					self.departure_event_occured(event_time)
 
 
-		# Calculate performance metrics after the simulation is run and complete
+		# Calculate output variables after the simulation is run and complete
 		self.Nt_observer_avg = sum(self.Nt_observer)/len(self.Nt_observer)
 		self.Nt_arrival_avg = sum(self.Nt_arrival)/len(self.Nt_arrival)
 		self.Tsojourn_avg = sum(self.Tsojourn)/len(self.Tsojourn)
@@ -300,8 +295,9 @@ class Simulation:
 		# print('P idle', self.Pidle, '%')
 		# print('P loss', self.Ploss, '%')
 
-		# t1 = time.time()
-		# print('Time taken to run simulation:', t1-t0)
+		t1 = time.time()
+		if (t1-t0) > 6:
+			print('Time taken in run simulation:', t1-t0)
 
 		return (self.Nt_observer_avg, self.Pidle, self.Nt_arrival_avg, self.Tsojourn_avg, self.Ploss)
 		
@@ -313,7 +309,7 @@ class Simulation:
 t0=time.time()
 
 # Question 1
-print('\nQUESTION 1')
+print('\nQUESTION 1 - Exponential random variable generator')
 test_uniform_random_value_generator()  #tests Python's built in uniform random generator
 generate_1000_exponential_random_values() # uses-> generate_exponential_random_value(mu)
 
@@ -322,60 +318,53 @@ generate_1000_exponential_random_values() # uses-> generate_exponential_random_v
 print('\nQUESTION 2 - Build simulator for M/M/1, D/M/1 and M/G/1')
 
 # Initialize all variables to run the simulations
-T = 10000   # FIX THISS!!
-alpha = 50 # Parameter for observation times 
+T = 10000   
 L = 20000 # Average length of packets
 C = 2000000 # Transmission rate of output link in bits/sec
 rho = 0.5  # Utilization factor of queue
-n = 1  # 1 server
-K = inf  # Infinite size of buffer
 L1 = 16000  # For M/G/1 
 L2 = 21000   # For M/G/1
 prob = 0.2   # For M/G/1
 
 # Check if the value of T gives stable result
 print('Checking if the T being used is generating a stable system')
-rho = 0.5
-T = 10000
 print('T ->', T)
 
-MM1 = Simulation('M', 'M', n, K, T, L, C, rho, L1, L2, prob)
+MM1 = Simulation('M', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
 No_of_packets_MM1, _, _, _, _ = MM1.run_simulation()
 
-DM1 = Simulation('D', 'M', n, K, T, L, C, rho, L1, L2, prob)
+DM1 = Simulation('D', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
 No_of_packets_DM1, _, _, _, _ = DM1.run_simulation()
 
-MG1 = Simulation('M', 'G', n, K, T, L, C, rho, L1, L2, prob)
+MG1 = Simulation('M', 'G', 1, inf, T, L, C, rho, L1, L2, prob)
 No_of_packets_MG1, _, _, _, _ = MG1.run_simulation()
 
-T = 20000
-print('2T ->', T)
-MM1 = Simulation('M', 'M', n, K, T, L, C, rho, L1, L2, prob)
+T_double = 2*T
+print('2T ->', T_double)
+MM1 = Simulation('M', 'M', 1, inf, T_double, L, C, rho, L1, L2, prob)
 No_of_packets_MM1_2T, _, _, _, _ = MM1.run_simulation()
 
-DM1 = Simulation('D', 'M', n, K, T, L, C, rho, L1, L2, prob)
+DM1 = Simulation('D', 'M', 1, inf, T_double, L, C, rho, L1, L2, prob)
 No_of_packets_DM1_2T, _, _, _, _ = DM1.run_simulation()
 
-MG1 = Simulation('M', 'G', n, K, T, L, C, rho, L1, L2, prob)
+MG1 = Simulation('M', 'G', 1, inf, T_double, L, C, rho, L1, L2, prob)
 No_of_packets_MG1_2T, _, _, _, _ = MG1.run_simulation()
 
 MM1_ratio = (No_of_packets_MM1 - No_of_packets_MM1_2T)/No_of_packets_MM1 * 100
 DM1_ratio = (No_of_packets_DM1 - No_of_packets_DM1_2T)/No_of_packets_DM1 * 100
 MG1_ratio = (No_of_packets_MG1 - No_of_packets_MG1_2T)/No_of_packets_MG1 * 100
 
-print('Difference in values for MM1: {0:.1f}%'.format(MM1_ratio))
-print('Difference in values for MM1: {0:.1f}%'.format(DM1_ratio))
-print('Difference in values for MM1: {0:.1f}%'.format(MG1_ratio))
+print('Difference in values for M/M/1: {0:.1f}%'.format(MM1_ratio))
+print('Difference in values for D/M1: {0:.1f}%'.format(DM1_ratio))
+print('Difference in values for M/G/1: {0:.1f}%'.format(MG1_ratio))
 if (MM1_ratio < 5 and DM1_ratio < 5 and MG1_ratio < 5):
-	print('System is stable with T = 10,000 - values within 5%')
+	print('System is stable with T = {0} (values within 5%)'.format(T))
 else:
-	print('System NOT stable with T = 10,000 - values differ more than 5%')
-T = 10000 # Reset total time back to 10,000 seconds since that gives a stable system
-
+	print('System NOT stable with T = {0} (values differ more than 5%)'.format(T))
 
 
 # Question 3 - Run simulation for the 3 queues for rho from 0.35 to 0.95 and plot graphs
-print('\nQUESTION 3- Run simulation for the 3 queues for rho from 0.35 to 0.95')
+print('\nQUESTION 3 - Run simulation for the 3 queues for rho from 0.35 to 0.95')
 
 EN_MM1 = []
 Pidle_MM1 = []
@@ -396,21 +385,21 @@ for a in np.arange(0.35, 1.0, 0.05):
 	rho = round(a, 2)
 	rho_array.append(rho)
 
-	MM1 = Simulation('M', 'M', n, K, T, L, C, rho, L1, L2, prob)
+	MM1 = Simulation('M', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
 	EN, Pidle, EaN, ET, _ = MM1.run_simulation()
 	EN_MM1.append(EN)
 	Pidle_MM1.append(Pidle)
 	EaN_MM1.append(EaN)
 	ET_MM1.append(ET)
 
-	DM1 = Simulation('D', 'M', n, K, T, L, C, rho, L1, L2, prob)
+	DM1 = Simulation('D', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
 	EN, Pidle, EaN, ET, _  = DM1.run_simulation()
 	EN_DM1.append(EN)
 	Pidle_DM1.append(Pidle)
 	EaN_DM1.append(EaN)
 	ET_DM1.append(ET)
 
-	MG1 = Simulation('M', 'G', n, K, T, L, C, rho, L1, L2, prob)
+	MG1 = Simulation('M', 'G', 1, inf, T, L, C, rho, L1, L2, prob)
 	EN, Pidle, _ , ET, _ = MG1.run_simulation()
 	EN_MG1.append(EN)
 	Pidle_MG1.append(Pidle)
@@ -420,38 +409,38 @@ for a in np.arange(0.35, 1.0, 0.05):
 plt.figure()
 plt.plot(rho_array, EN_MM1, marker='o')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Average no. of packets in system (observer)')
-plt.title('Average no. of packets vs. utilization factor - M/M/1')
+plt.ylabel('E[N] - Average no. of packets in system (observer)')
+plt.title('E[N] vs. Rho - M/M/1')
 
 plt.figure()
 plt.plot(rho_array, EN_DM1, marker='o')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Average no. of packets in system (observer)')
-plt.title('Average no. of packets vs. utilization factor - D/M/1')
+plt.ylabel('E[N] - Average no. of packets in system (observer)')
+plt.title('E[N] vs. Rho - D/M/1')
 
 plt.figure()
 plt.plot(rho_array, EN_MG1, marker='o')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Average no. of packets in system (observer)')
-plt.title('Average no. of packets vs. utilization factor - M/G/1')
+plt.ylabel('E[N] - Average no. of packets in system (observer)')
+plt.title('E[N] vs. Rho - M/G/1')
 
 plt.figure()
 plt.plot(rho_array, Pidle_MM1, marker='o')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Proportion of time system is idle')
-plt.title('Proportion of time system is idle vs. utilization factor - M/M/1')
+plt.ylabel('P-idle - Proportion of time system is idle')
+plt.title('P-idle vs. Rho - M/M/1')
 
 plt.figure()
 plt.plot(rho_array, Pidle_DM1, marker='o')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Proportion of time system is idle')
-plt.title('Proportion of time system is idle vs. utilization factor - D/M/1')
+plt.ylabel('P-idle - Proportion of time system is idle')
+plt.title('P-idle vs. Rho - D/M/1')
 
 plt.figure()
 plt.plot(rho_array, Pidle_MG1, marker='o')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Proportion of time system is idle')
-plt.title('Proportion of time system is idle vs. utilization factor - M/G/1')
+plt.ylabel('P-idle - Proportion of time system is idle')
+plt.title('P-idle vs. Rho - M/G/1')
 
 # Comparitive figures (all queues in 1 figure)
 plt.figure()
@@ -459,96 +448,53 @@ plt.plot(rho_array, EN_MM1, color = 'r', marker='x', label='M/M/1')
 plt.plot(rho_array, EN_DM1, color = 'g', marker='x', label='D/M/1')
 plt.plot(rho_array, EN_MG1, color = 'b', marker='x', label='M/G/1')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Average no. of packets in system (observer)')
-plt.title('Average no. of packets vs. utilization factor')
+plt.ylabel('E[N] - Average no. of packets in system (observer)')
+plt.title('E[N] vs. Rho - Comparison')
 plt.legend()
 
 plt.figure()
-plt.plot(rho_array, Pidle_MM1, color = 'r', marker='x', label='M/M/1')
-plt.plot(rho_array, Pidle_DM1, color = 'g', marker='x', label='D/M/1')
-plt.plot(rho_array, Pidle_MG1, color = 'b', marker='x', label='M/G/1')
+plt.plot(rho_array, Pidle_MM1, color = 'r', marker=2, linestyle = '-', label='M/M/1')
+plt.plot(rho_array, Pidle_DM1, color = 'g', marker=3, linestyle = '--', label='D/M/1')
+plt.plot(rho_array, Pidle_MG1, color = 'b', marker='x', linestyle = ':', label='M/G/1')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Proportion of time system is idle')
-plt.title('Proportion of time system is idle vs. utilization factor')
+plt.ylabel('P-idle - Proportion of time system is idle')
+plt.title('P-idle vs. Rho - Comparison')
 plt.legend()
-
-
-# # Check if system is stable, and if T = 10000 is okay
-# EN_MM1_arr_T = np.array(EN_MM1)
-# EN_DM1_arr_T = np.array(EN_DM1)
-# EN_MG1_arr_T = np.array(EN_MG1)
-
-# EN_MM1_2T = []
-# EN_DM1_2T = []
-# EN_MG1_2T = []
-
-# T = 2*T
-
-# for a in np.arange(0.35, 1.0, 0.05):
-# 	rho = round(a, 2)
-
-# 	MM1 = Simulation(T, alpha, L, C, rho, 'M', 'M', n, K, L1, L2, prob)
-# 	EN, _, _, _, _ = MM1.run_simulation()
-# 	EN_MM1_2T.append(EN)
-
-# 	DM1 = Simulation(T, alpha, L, C, rho, 'D', 'M', n, K, L1, L2, prob)
-# 	EN, _, _, _, _  = DM1.run_simulation()
-# 	EN_DM1_2T.append(EN)
-
-# 	MG1 = Simulation(T, alpha, L, C, rho, 'M', 'G', n, K, L1, L2, prob)
-# 	EN, _, _ , _, _ = MG1.run_simulation()
-# 	EN_MG1_2T.append(EN)
-
-# EN_MM1_arr_2T = np.array(EN_MM1_2T)
-# EN_DM1_arr_2T = np.array(EN_DM1_2T)
-# EN_MG1_arr_2T = np.array(EN_MG1_2T)
-
-# EN_MM1_subtract = np.subtract(EN_MM1_arr_T, EN_MM1_arr_2T)
-# EN_DM1_subtract = np.subtract(EN_DM1_arr_T, EN_DM1_arr_2T)
-# EN_MG1_subtract = np.subtract(EN_MG1_arr_T, EN_MG1_arr_2T)
-
-# EN_MM1_ratio = np.divide(EN_MM1_subtract, EN_MM1_arr_T)
-# EN_DM1_ratio = np.divide(EN_DM1_subtract, EN_DM1_arr_T)
-# EN_MG1_ratio = np.divide(EN_MG1_subtract, EN_MG1_arr_T)
-
-# print('EN_MM1_ratio', EN_MM1_ratio)
-# print('EN_DM1_ratio', EN_DM1_ratio)
-# print('EN_MG1_ratio', EN_MG1_ratio)
-
 
 
 # Question 4 - Perhaps simulate all 3 queues with rho = 1.5
 print('\nQUESTION 4 - Rho = 1.5 for all three queues')
 rho = 1.5
-MM1 = Simulation('M', 'M', n, K, T, L, C, rho, L1, L2, prob)
+MM1 = Simulation('M', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
 EN_MM1_rho, Pidle_MM1_rho, _ , _, _ = MM1.run_simulation()
-DM1 = Simulation('D', 'M', n, K, T, L, C, rho, L1, L2, prob)
+DM1 = Simulation('D', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
 EN_DM1_rho, Pidle_DM1_rho, _ , _, _ = MM1.run_simulation()
-MG1 = Simulation('M', 'G', n, K, T, L, C, rho, L1, L2, prob)
+MG1 = Simulation('M', 'G', 1, inf, T, L, C, rho, L1, L2, prob)
 EN_MG1_rho, Pidle_MG1_rho, _ , _, _ = MM1.run_simulation()
 print('Average no. of packets in system for M/M/1 (rho = 1.5): {0:1f}'.format(EN_MM1_rho))
 print('Proportion of time system is idle for M/M/1 (rho = 1.5): {0:1f}'.format(Pidle_MM1_rho))
-print('Average no. of packets in system for M/M/1 (rho = 1.5): {0:1f}'.format(EN_DM1_rho))
-print('Proportion of time system is idle for M/M/1 (rho = 1.5): {0:1f}'.format(Pidle_DM1_rho))
-print('Average no. of packets in system for M/M/1 (rho = 1.5): {0:1f}'.format(EN_MG1_rho))
-print('Proportion of time system is idle for M/M/1 (rho = 1.5): {0:1f}'.format(Pidle_MG1_rho))
+print('Average no. of packets in system for D/M/1 (rho = 1.5): {0:1f}'.format(EN_DM1_rho))
+print('Proportion of time system is idle for D/M/1 (rho = 1.5): {0:1f}'.format(Pidle_DM1_rho))
+print('Average no. of packets in system for M/G/1 (rho = 1.5): {0:1f}'.format(EN_MG1_rho))
+print('Proportion of time system is idle for M/G/1 (rho = 1.5): {0:1f}'.format(Pidle_MG1_rho))
+
 
 # Question 5 - Compare E[N] and Ea[N] for M/M/1 and D/M/1 (uses values from Question 3)
 print('\nQUESTION 5 - Generating plots to compare E[N] and Ea[N] for M/M/1 and D/M/1')
 plt.figure()
-plt.plot(rho_array, EN_MM1, color = 'r', marker='x', label='Observer')
-plt.plot(rho_array, EaN_MM1, color = 'g', marker='x', label='Arrival')
+plt.plot(rho_array, EN_MM1, color = 'b', marker='x', label='Observer E[N]')
+plt.plot(rho_array, EaN_MM1, color = 'g', marker='x', label='Arrival Ea[N]')
 plt.xlabel('Rho - Utilization factor')
 plt.ylabel('Average no. of packets in system')
-plt.title('Average no. of packets (M/M/1) vs. utilization factor')
+plt.title('Average no. of packets vs. Rho - M/M/1')
 plt.legend()
 
 plt.figure()
-plt.plot(rho_array, EN_DM1, color = 'r', marker='x', label='Observer')
-plt.plot(rho_array, EaN_DM1, color = 'g', marker='x', label='Arrival')
+plt.plot(rho_array, EN_DM1, color = 'b', marker='x', label='Observer E[N]')
+plt.plot(rho_array, EaN_DM1, color = 'g', marker='x', label='Arrival Ea[N]')
 plt.xlabel('Rho - Utilization factor')
 plt.ylabel('Average no. of packets in system')
-plt.title('Average no. of packets (D/M/1) vs. utilization factor')
+plt.title('Average no. of packets vs. Rho - D/M/1')
 plt.legend()
 
 
@@ -559,8 +505,8 @@ plt.plot(rho_array, ET_MM1, color = 'r', marker='x', label='M/M/1')
 plt.plot(rho_array, ET_DM1, color = 'g', marker='x', label='D/M/1')
 plt.plot(rho_array, ET_MG1, color = 'b', marker='x', label='M/G/1')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Average Soujorn Time')
-plt.title('Average Soujorn Time vs. utilization factor')
+plt.ylabel('E[T] - Average Soujorn Time')
+plt.title('E[T] vs. Rho')
 plt.legend()
 
 
@@ -576,18 +522,15 @@ rho = 0.4
 while rho <= 3.001:
 	rho_array.append(rho)
 
-	K=10
-	MD1K_10 = Simulation('M', 'D', n, K, T, L, C, rho, L1, L2, prob)
+	MD1K_10 = Simulation('M', 'D', 1, 10, T, L, C, rho, L1, L2, prob)  # K = 10
 	_, _, _, _, Ploss  = MD1K_10.run_simulation()
 	Ploss_10.append(Ploss)
 
-	K=50
-	MD1K_50 = Simulation('M', 'D', n, K, T, L, C, rho, L1, L2, prob)
+	MD1K_50 = Simulation('M', 'D', 1, 50, T, L, C, rho, L1, L2, prob)  # K = 50
 	_, _, _, _, Ploss  = MD1K_50.run_simulation()
 	Ploss_50.append(Ploss)
 
-	K=100
-	MD1K_100 = Simulation('M', 'D', n, K, T, L, C, rho, L1, L2, prob)
+	MD1K_100 = Simulation('M', 'D', 1, 100, T, L, C, rho, L1, L2, prob)  # K = 100
 	_, _, _, _, Ploss  = MD1K_100.run_simulation()
 	Ploss_100.append(Ploss)
 
@@ -601,19 +544,18 @@ while rho <= 3.001:
 print('\nQUESTION 8 - Generating plots for P loss for M/D/1/K')
 
 plt.figure()
-plt.plot(rho_array, Ploss_10, color = 'r', marker='x', label='K = 10')
-plt.plot(rho_array, Ploss_50, color = 'g', marker='x', label='K = 50')
-plt.plot(rho_array, Ploss_100, color = 'b', marker='x', label='K = 100')
+plt.plot(rho_array, Ploss_10, color = 'r', marker=2, linestyle = '-', label='K = 10')
+plt.plot(rho_array, Ploss_50, color = 'g', marker=3, linestyle = '--', label='K = 50')
+plt.plot(rho_array, Ploss_100, color = 'b', marker='x', linestyle = ':', label='K = 100')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Proportion of packets lost')
-plt.title('Proportion of packets lost vs. utilization factor - M/D/1/K')
+plt.ylabel('P-loss - Proportion of packets lost')
+plt.title('P-loss vs. Rho - M/D/1/K')
 plt.legend()
 
 
 # Question 9 - M/D/2 Queue
-print('\nQUESTION 9 - Compare M/D/2 (transmission rate C) with M/D/1 (rate 2C)')
+print('\nQUESTION 9 - Compare M/D/2 (transmission rate C) with M/D/1 (transmission rate 2C)')
 
-K = inf
 C_double = 2*C
 EN_MD2_C = []
 EN_MD1_2C = []
@@ -623,25 +565,25 @@ for a in np.arange(0.35, 1.0, 0.05):
 	rho = round(a, 2)
 	rho_array.append(rho)
 
-	MD2_C = Simulation('M', 'D', 2, K, T, L, C, rho, L1, L2, prob)
+	MD2_C = Simulation('M', 'D', 2, inf, T, L, C, rho, L1, L2, prob)
 	EN, _, _, _, _ = MD2_C.run_simulation()
 	EN_MD2_C.append(EN)
 
-	MD1_2C = Simulation('M', 'D', 1, K, T, L, C_double, rho, L1, L2, prob)
+	MD1_2C = Simulation('M', 'D', 1, inf, T, L, C_double, rho, L1, L2, prob)
 	EN, _, _, _, _ = MD1_2C.run_simulation()
 	EN_MD1_2C.append(EN)
 
 
 plt.figure()
-plt.plot(rho_array, EN_MD2_C, color = 'r', marker='x', label='M/D/2 - C')
-plt.plot(rho_array, EN_MD1_2C, color = 'g', marker='x', label='M/D/1 - 2C')
+plt.plot(rho_array, EN_MD2_C, color = 'b', marker='x', linestyle = '-', label='M/D/2 - rate C')
+plt.plot(rho_array, EN_MD1_2C, color = 'g', marker='+', linestyle = '--', label='M/D/1 - rate 2C')
 plt.xlabel('Rho - Utilization factor')
-plt.ylabel('Average no. of packets in system')
-plt.title('Average no. of packets vs. utilization factor')
+plt.ylabel('E[N] - Average no. of packets in system (observer)')
+plt.title('E[N] vs. Rho')
 plt.legend()
 
 t1 = time.time()
-print('\nTOTAL TIME TAKEN FOR CODE TO RUN:', t1-t0)
+print('\nTotal time taken for code to run: {0:.2f} mins'.format((t1-t0)/60))
 
 plt.show()
 
