@@ -2,6 +2,7 @@
 # Filza Mazahir - 20295951 - fmazahir@uwaterloo.ca
 
 
+# Import libraries
 import random
 import numpy as np
 from math import log, inf
@@ -13,9 +14,14 @@ import matplotlib.pyplot as plt
 
 import time
 
+# Open an output text file to output values for all figures
 f = open('output.txt', 'w')
 
-# Test Pythonuniform random values generator
+
+
+###########   Random Value Generator   ###########
+
+# Test Python's built-in uniform random values generator
 def test_uniform_random_value_generator():
 	# Generate 1000 uniform random values
 	uniform_rv_list = []
@@ -23,7 +29,7 @@ def test_uniform_random_value_generator():
 		uniform_random_value = random.uniform(0, 1) # Python's built-in uniform random generator
 		uniform_rv_list.append(uniform_random_value)
 
-	# Check with mean and variance (convert to numpy array and use np.mean and np.var)
+	# Check with mean and variance - convert to numpy array and use np.mean and np.var
 	uniform_rv_arr = np.array(uniform_rv_list)
 	mean = np.mean(uniform_rv_arr)
 	var = np.var(uniform_rv_arr)
@@ -42,16 +48,17 @@ def generate_exponential_random_value(mu):
 	# But this function was written from the equation as per Question 1
 
 
-# Generate 1000 Exponential Random Values to test - QUESTION 1 
+# Generate 1000 Exponential Random Values to test - QUESTION 1
 def generate_1000_exponential_random_values():
 	mu = 0.1    # 1/mu = 10seconds -> mu = 0.1
+
+	# Generate 1000 exponential random values
 	exponential_rv_list = []
 	for x in range(1000):
-		expoential_rv = generate_exponential_random_value(mu)
-		exponential_rv_list.append(expoential_rv)
+		exponential_rv = generate_exponential_random_value(mu)
+		exponential_rv_list.append(exponential_rv)
 
-	# Check with mean and variance 
-	# Convert to numpy array and use np.mean and np.var
+	# Check with mean and variance - convert to numpy array and use np.mean and np.var
 	exponential_rv_arr = np.array(exponential_rv_list)
 	mean = np.mean(exponential_rv_arr)
 	var = np.var(exponential_rv_arr)
@@ -63,25 +70,18 @@ def generate_1000_exponential_random_values():
 	f.write('Variance (exponential) - expected 100, calculated: {0:.1f}\n'.format(var))
 	return
 
-# class SimulationResults:
-# 	def __init__(self, Nt_observer_avg, Pidle, Nt_arrival_avg, Tsojourn_avg, Ploss):
-# 		self.Nt_observer_avg = Nt_observer_avg
-# 		self.Pidle = Pidle
-# 		self.Nt_arrival_avg = Nt_arrival_avg
-# 		self.Tsojourn_avg = Tsojourn_avg
-# 		self.Ploss = Ploss
 
-		
+
+###########   Simulation   ###########
 
 class Simulation:
-	# MM1 = Simulation('M', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
 	def __init__(self, arrival_process, service_process, n, K, T, L, C, rho, L1, L2, prob):
 
 		#Input variables
 		self.arrival_process = arrival_process  # Arrival process ('M' or 'D')
 		self.service_process = service_process  # Service process ('M', 'D' or 'G')
 		self.n = n # Number of servers in the queue
-		self.K = K  # Size of buffer
+		self.K = K  # Size of buffer (units-> no. of packets)
 
 		self.T = T  # Total time to run the simulation
 		self.L = L # Average packet length in bits
@@ -92,8 +92,8 @@ class Simulation:
 		self.L2 = L2 # For General service process, L2 is the packet length with probability of (1-prob)
 		self.prob = prob  # For General service process, Probability of the packet to have L1 length
 
-		self.lambd = (self.n * self.rho * self.C )/ self.L  # Arrival rate (average number of packets generated per second)
-		self.alpha = self.lambd  # Observer rate - same as lambda so observations are in the same order as arrival packets
+		self.lambd = (self.n * self.rho * self.C )/ self.L  # Arrival rate (avg no. of packets per sec)
+		self.alpha = self.lambd  # Observer rate - same as arrival rate so they are in the same order  
 
 		# State of the system 
 		self.Na = 0 # Number of packet arrival events
@@ -102,18 +102,12 @@ class Simulation:
 		self.Nt = 0 # Total number of packets in the system
 
 		# Helper variables to keep track of things and determine the output variables
-		# self.time_system_idle = 0  # Total time in the simulation that system is idle
-		# self.last_departure_time = 0  # Departure time of the last packet that departed from the system
-
-		self.idle_counter = 0
-		self.number_packets_dropped = 0
-
-		self.Tsojourn = []  # Total sojourn time for each packet
 		self.Nt_observer = [] # No. of packets in system as seen by each observer event
 		self.Nt_arrival = [] # No. of packets in system as seen by each arrival event
-
-		# self.dropped_packet_ids = set() # Set of packet ids for the packets that are dropped on arrival because of full buffer
+		self.Tsojourn = []  # Total sojourn time for each packet
+		self.idle_counter = 0  # Number of times an observation event saw the system as idle
 		self.total_packets_generated = 0 # Total number of packets generated in the system
+		self.number_packets_dropped = 0  # Number of packets dropped by the queue
 		
 		print('Running simulation -> {0}/{1}/{2}/{3} (Rho = {4}, Lambda = {5})....'.format(self.arrival_process, self.service_process, self.n, self.K, self.rho, self.lambd), end='', flush=True)
 		
@@ -122,17 +116,13 @@ class Simulation:
 
 
 	# Function to generate arrival time based on the type of arrival process
-	# Parameter is either alpha or lambda (based on whether the observer or arrival events are being generated)
 	def generate_arrival_time(self):
 		# Poisson Distribution for arrival process
 		if self.arrival_process == 'M':  
-			# random_time = generate_exponential_random_value(self.lambd)
-			# arrival_time = last_packet_arrival_time + random_time
 			arrival_time = generate_exponential_random_value(self.lambd)
 
 		# Deterministic Distribution for arrival process (constant)
 		elif self.arrival_process == 'D':  
-			# arrival_time = last_packet_arrival_time + (1.0/parameter)
 			arrival_time = (1.0/self.lambd)
 
 		return arrival_time
@@ -147,7 +137,10 @@ class Simulation:
 
 		# General Distribution with bipolar length for service process
 		elif self.service_process == 'G':
-			uniform_random_value = random.uniform(0, 1)
+			# Generate uniform random number between 0 and 1
+			uniform_random_value = random.uniform(0, 1) 
+
+			# Get packet length based on the number generated
 			if uniform_random_value <= self.prob:
 				packet_length = self.L1
 			else:
@@ -160,7 +153,7 @@ class Simulation:
 		return packet_length
 
 
-	# Create an Event Scheduler
+	# Function to create Event Scheduler
 	def create_event_scheduler(self):
 		
 		self.observation_times_list = []  # List of all observation times generated
@@ -174,22 +167,25 @@ class Simulation:
 			observation_time += generate_exponential_random_value(self.alpha)
 			self.observation_times_list.append(observation_time)
 
-		# Generate first packet of the queue - get arrival time and packet length
-		arrival_time = self.generate_arrival_time()
-		packet_length = self.generate_packet_length()
-		self.total_packets_generated += 1 # Increment number of packets generated (was inititalized to 0)
-		
-		# Calculate subsequent packet's arrival and depature times, and packet length
+
+		# Generate packets, get packet length and its arrival and depature times
+		arrival_time = 0   # Arrival time initialization, starts at t = 0
 		while arrival_time < T:
 
-			# length of depature_times_list will always be less than K
+			# Generate new packet - get arrival time and packet length
+			arrival_time += self.generate_arrival_time()  # Generate arrival time
+			packet_length = self.generate_packet_length() # Generate packet length
+			self.total_packets_generated += 1 # Increment number of packets generated (was inititalized to 0)
+
+			# Index of server that's available first (for 1 server queue, there is only 1 value here which is the minimum)
+			i = server_available_time.index(min(server_available_time)) 
+
+			# Functionality added for M/D/1/K queue - check if buffer is full
+			# If not full - get departure time and sojourn time of this packet, and add to list
+			# Length of depature_times_list will always be less than K when K=inf
 			if len(departure_times_list) < self.K or departure_times_list[-self.K] < arrival_time:
 				
-
-				# Index of server that's available first (for 1 server queue, there is only 1 value here which is the minimum)
-				i = server_available_time.index(min(server_available_time)) 
-
-				# Calculate departure time and soujourn time
+				# Calculate the packet's departure time 
 				# If server is free when the packet arrived (no wait)
 				if server_available_time[i] <= arrival_time:
 					departure_time = arrival_time + (packet_length/self.C)	
@@ -209,15 +205,11 @@ class Simulation:
 				arrival_times_list.append(arrival_time)
 				departure_times_list.append(departure_time)
 
+			# If buffer is full - drop packet (don't add the arrival and depature time to list)
 			else:
-				self.number_packets_dropped += 1
+				self.number_packets_dropped += 1  # Increment number of dropped packets
 			
-
-			# Generate next packet - get arrival time and packet length
-			arrival_time += self.generate_arrival_time()
-			packet_length = self.generate_packet_length()
-			self.total_packets_generated += 1  # Increment number of packets generated
-
+				
 		# Combine the list of all observation times, arrival times, and departure times in one list
 		events_list = []  # List of all events combined
 
@@ -237,16 +229,17 @@ class Simulation:
 		events_list.sort(key=lambda event: event[1])
 
 		# Create Event Scheduler as a double ended queue from the events_list
-		# events_list used earlier to combine instead of Event_Scheduler so sorting is more efficient
+		# Event Scheduler created after events_list is already sorted with time so its more efficient
 		self.Event_Scheduler = deque(events_list)
 
 		return
 
 
-	# Run the simulation - goes through each event in the Event Scheduler and calls its respective function
+	# Function to run the simulation - goes through each event in the Event Scheduler 
 	def run_simulation(self):
 
 		# Loop through the Event Scheduler (continue looping as long as it has an element)
+		# Update system metrics based on type of event
 		while self.Event_Scheduler:
 			# Dequeue the event from the Event Scheduler
 			event_type, event_time = self.Event_Scheduler.popleft() 
@@ -272,11 +265,11 @@ class Simulation:
 				self.Nt = self.Na - self.Nd  # Update current number of packets in the system
 
 		# Calculate output variables after the simulation is run and complete
-		self.EN = sum(self.Nt_observer)/len(self.Nt_observer) # average of all the number of packets seen by obsever
-		self.EaN = sum(self.Nt_arrival)/len(self.Nt_arrival) # average of all the number of packets seen by arrival packet
+		self.EN = sum(self.Nt_observer)/len(self.Nt_observer) # avg. no. of packets seen by obsever
+		self.EaN = sum(self.Nt_arrival)/len(self.Nt_arrival) # aavg. no. of packets seen by arrival packet
 		self.ET = sum(self.Tsojourn)/len(self.Tsojourn) # average of the sojourn time of all packets
-		self.Pidle = self.idle_counter/self.No  # Number of times observer saw system idle / Total number of observations
-		self.Ploss = self.number_packets_dropped/self.total_packets_generated  # Number of packets dropped / Total number of packets genreated
+		self.Pidle = self.idle_counter/self.No  # Proportion of time observer saw system idle 
+		self.Ploss = self.number_packets_dropped/self.total_packets_generated  # Packet lost probability
 	
 		print('done')
 		return
@@ -300,16 +293,16 @@ generate_1000_exponential_random_values() # uses-> generate_exponential_random_v
 
 ############   QUESTION 2 - Build simulator for M/M/1, D/M/1, and M/G/1   ###########
 print('\nQUESTION 2 - Build simulator for M/M/1, D/M/1 and M/G/1')
-# Simulator built above in class Simulation. Testing for T (total simulation time) done here
+# Simulator built above in class Simulation (lines 75-273). Testing for T (total simulation time) done here
 
 # Initialize all variables to run the simulations as given in Question 3
-T = 10000   
-L = 20000 # Average length of packets
+T = 10000   # Total time for the simulation
+L = 20000   # Average length of packets
 C = 2000000 # Transmission rate of output link in bits/sec
-rho = 0.5  # Utilization factor of queue
+rho = 0.5   # Utilization factor of queue
 L1 = 16000  # For M/G/1 
-L2 = 21000   # For M/G/1
-prob = 0.2   # For M/G/1
+L2 = 21000  # For M/G/1
+prob = 0.2  # For M/G/1
 
 
 # Check if the value of T gives stable result
@@ -317,25 +310,25 @@ print('Checking if the T being used is generating a stable system')
 print('T ->', T)
 
 # Run the simulation for M/M/1, D/M/1, and M/G/1 with rho = 0.5 and T = 10,000
-MM1 = Simulation('M', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
+MM1 = Simulation('M', 'M', 1, inf, T, L, C, rho, L1, L2, prob) # M/M/1
 MM1.run_simulation()
 
-DM1 = Simulation('D', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
+DM1 = Simulation('D', 'M', 1, inf, T, L, C, rho, L1, L2, prob) # D/M/1
 DM1.run_simulation()
 
-MG1 = Simulation('M', 'G', 1, inf, T, L, C, rho, L1, L2, prob)
+MG1 = Simulation('M', 'G', 1, inf, T, L, C, rho, L1, L2, prob) # M/G/1
 MG1.run_simulation()
 
 # Run the simulation for M/M/1, D/M/1, and M/G/1 with rho = 0.5 and T = 20,000
 T_double = 2*T
 print('2T ->', T_double)
-MM1_2T = Simulation('M', 'M', 1, inf, T_double, L, C, rho, L1, L2, prob)
+MM1_2T = Simulation('M', 'M', 1, inf, T_double, L, C, rho, L1, L2, prob) # M/M/1
 MM1_2T.run_simulation()
 
-DM1_2T = Simulation('D', 'M', 1, inf, T_double, L, C, rho, L1, L2, prob)
+DM1_2T = Simulation('D', 'M', 1, inf, T_double, L, C, rho, L1, L2, prob) # D/M/1
 DM1_2T.run_simulation()
 
-MG1_2T = Simulation('M', 'G', 1, inf, T_double, L, C, rho, L1, L2, prob)
+MG1_2T = Simulation('M', 'G', 1, inf, T_double, L, C, rho, L1, L2, prob) # M/G/1
 MG1_2T.run_simulation()
 
 # Compare the E[N] values and compute a ratio of the difference in values
@@ -514,35 +507,41 @@ MM1_rho05 = Simulation('M', 'M', 1, inf, T, L, C, rho, L1, L2, prob)
 MM1_rho05.run_simulation()
 
 # Output the E[N] of the simulations
-print('E[N] - Average no. of packets in system for M/M/1 (rho = 1.5): {0:1f}'.format(MM1_rho15.EN))
-print('Pidle - Proportion of time system is idle for M/M/1 (rho = 1.5): {0:1f}'.format(MM1_rho15.Pidle))
-print('E[N] - Average no. of packets in system for D/M/1 (rho = 1.5): {0:1f}'.format(DM1_rho15.EN))
-print('Pidle - Proportion of time system is idle for D/M/1 (rho = 1.5): {0:1f}'.format(DM1_rho15.Pidle))
-print('E[N] - Average no. of packets in system for M/G/1 (rho = 1.5): {0:1f}'.format(MG1_rho15.EN))
-print('Pidle - Proportion of time system is idle for M/G/1 (rho = 1.5): {0:1f}'.format(MG1_rho15.Pidle))
+print('\nM/M/1 - E[N] - Average no. of packets in system (rho = 1.5): {0:1f}'.format(MM1_rho15.EN))
+print('M/M/1 - Pidle - Proportion of time system is idle (rho = 1.5): {0:1f}'.format(MM1_rho15.Pidle))
+print('\nComparison of M/M/1 at rho=1.5 with other queues at rho=1.5:')
+print('D/M/1 - E[N] - Average no. of packets in system (rho = 1.5): {0:1f}'.format(DM1_rho15.EN))
+print('D/M/1 - Pidle - Proportion of time system is idle (rho = 1.5): {0:1f}'.format(DM1_rho15.Pidle))
+print('M/G/1 - E[N] - Average no. of packets in system (rho = 1.5): {0:1f}'.format(MG1_rho15.EN))
+print('M/G/1 - Pidle - Proportion of time system is idle (rho = 1.5): {0:1f}'.format(MG1_rho15.Pidle))
+print('\nComparison of M/M/1 at rho=1.5 with M/M/1 at rho=0.5')
+print('M/M/1 - E[N] - Average no. of packets in system (rho = 0.5): {0:1f}'.format(MM1_rho05.EN))
+print('M/M/1 - Pidle - Proportion of time system is idle (rho = 0.5): {0:1f}'.format(MM1_rho05.Pidle))
 
-f.write('E[N] - Average no. of packets in system for M/M/1 (rho = 1.5): {0:1f}\n'.format(MM1_rho15.EN))
-f.write('Pidle - Proportion of time system is idle for M/M/1 (rho = 1.5): {0:1f}\n'.format(MM1_rho15.Pidle))
-f.write('E[N] - Average no. of packets in system for D/M/1 (rho = 1.5): {0:1f}\n'.format(DM1_rho15.EN))
-f.write('Pidle - Proportion of time system is idle for D/M/1 (rho = 1.5): {0:1f}\n'.format(DM1_rho15.Pidle))
-f.write('E[N] - Average no. of packets in system for M/G/1 (rho = 1.5): {0:1f}\n'.format(MG1_rho15.EN))
-f.write('Pidle - Proportion of time system is idle for M/G/1 (rho = 1.5): {0:1f}\n'.format(MG1_rho15.Pidle))
-
-
+f.write('M/M/1 - E[N] - Average no. of packets in system (rho = 1.5): {0:1f}\n'.format(MM1_rho15.EN))
+f.write('M/M/1 - Pidle - Proportion of time system is idle (rho = 1.5): {0:1f}\n'.format(MM1_rho15.Pidle))
+f.write('Comparison of M/M/1 with rho = 1.5 with other queues:\n')
+f.write('D/M/1 - E[N] - Average no. of packets in system (rho = 1.5): {0:1f}\n'.format(DM1_rho15.EN))
+f.write('D/M/1 - Pidle - Proportion of time system is idle (rho = 1.5): {0:1f}\n'.format(DM1_rho15.Pidle))
+f.write('M/G/1 - E[N] - Average no. of packets in system (rho = 1.5): {0:1f}\n'.format(MG1_rho15.EN))
+f.write('M/G/1 - Pidle - Proportion of time system is idle (rho = 1.5): {0:1f}\n'.format(MG1_rho15.Pidle))
+f.write('Comparison of M/M/1 at rho=1.5 with M/M/1 at rho=0.5\n')
+f.write('M/M/1 - E[N] - Average no. of packets in system (rho = 0.5): {0:1f}\n'.format(MM1_rho05.EN))
+f.write('M/M/1 - Pidle - Proportion of time system is idle (rho = 0.5): {0:1f}\n'.format(MM1_rho05.Pidle))
 
 # E[N] vs Observation Times figure for Rho=1.5
 plt.figure()
-plt.plot(MM1_rho15.observation_times_list, MM1_rho15.Nt_observer, marker='.')
+plt.scatter(MM1_rho15.observation_times_list, MM1_rho15.Nt_observer, marker='.')
 plt.xlabel('Observation Times (seconds)')
-plt.ylabel('Average no. of packets in system (observer)')
-plt.title('Average no. of packets (observer) vs. Observation Times - Rho=1.5')
+plt.ylabel('No. of packets in system')
+plt.title('No. of packets vs. Observation Times  (Rho=1.5)')
 
 # E[N] vs Observation Times figure for Rho=0.5 (to compare trends if any)
 plt.figure()
-plt.plot(MM1_rho05.observation_times_list, MM1_rho05.Nt_observer, marker='.')
+plt.scatter(MM1_rho05.observation_times_list, MM1_rho05.Nt_observer, marker='.')
 plt.xlabel('Observation Times (seconds)')
-plt.ylabel('Average no. of packets in system (observer)')
-plt.title('Average no. of packets (observer) vs. Observation Times - Rho=0.5')
+plt.ylabel('No. of packets in system')
+plt.title('No. of packets vs. Observation Times  (Rho=0.5)')
 
 
 
@@ -604,7 +603,8 @@ f.write('M/G/1 - E[T] (average sojourn time in seconds)\n{0}\n'.format(ET_MG1))
 
 
 ############   QUESTION 7 - Build simulator for M/D/1/K   ############
-# Changes to code done above in the create_event_scheduler() function
+# Changes to code done above in the create_event_scheduler() function 
+# If else lines added at line 185 and 208
 
 
 
